@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cdc-lakehouse"
+version = "0.1.0"
+description = "Get fresh analytics without hammering the production database: stream every change into a lakehouse you can query with SQL, seconds behind live."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6", "pip-audit>=2.7"]
+# Only for the end-to-end check against the running stack.
+stream = ["psycopg[binary]>=3.2", "confluent-kafka>=2.5", "fastavro>=1.9"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# Bugs, security (bandit), modern syntax, imports, naming and test style; `ruff format` owns line length.
+select = ["E", "W", "F", "I", "B", "UP", "S", "SIM", "RUF", "N", "C4", "PT", "RET", "PIE", "PERF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use assert, throwaway credentials and seeded (non-cryptographic) randomness on purpose.
+"tests/**" = ["S101", "S105", "S106", "S311"]
