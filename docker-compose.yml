@@ -46,7 +46,7 @@ services:
     ports: ["8080:8080"]
 
   connect:
-    image: quay.io/debezium/connect:2.7.4.Final
+    image: quay.io/debezium/connect:3.7.0.Final
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
