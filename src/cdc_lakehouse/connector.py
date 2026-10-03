@@ -41,6 +41,8 @@ def _converter(prefix: str, registry_url: str) -> dict[str, str]:
         f"{prefix}.apicurio.registry.find-latest": "true",
         f"{prefix}.apicurio.registry.as-confluent": "true",
         f"{prefix}.apicurio.registry.use-id": "contentId",
+        # Put magic byte + schema id in the payload (Confluent framing), not in Kafka record headers.
+        f"{prefix}.apicurio.registry.headers.enabled": "false",
     }
 
 

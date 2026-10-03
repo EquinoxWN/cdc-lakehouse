@@ -29,6 +29,8 @@ def test_both_sides_use_avro_with_registry(side):
     assert cfg[f"{side}.converter.apicurio.registry.url"].endswith("/apis/registry/v2")
     assert cfg[f"{side}.converter.apicurio.registry.auto-register"] == "true"
     assert cfg[f"{side}.converter.apicurio.registry.as-confluent"] == "true"
+    # Schema id must travel in the payload, where wire.split reads it, not in record headers.
+    assert cfg[f"{side}.converter.apicurio.registry.headers.enabled"] == "false"
 
 
 def test_all_values_are_strings():

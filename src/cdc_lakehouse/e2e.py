@@ -67,7 +67,9 @@ def _make_changes() -> None:
         conn.execute("DELETE FROM customers WHERE email = 'temp@example.com'")
 
 
-def _consume(expected: Counter[str], timeout_s: float) -> tuple[list[ChangeEvent], list[int]]:
+def _consume(
+    expected: Counter[str], timeout_s: float, problems: list[str]
+) -> tuple[list[ChangeEvent], list[int]]:
     """Read the customers topic from the start until the expected op counts are reached."""
     from confluent_kafka import Consumer
 
@@ -86,9 +88,20 @@ def _consume(expected: Counter[str], timeout_s: float) -> tuple[list[ChangeEvent
     try:
         while time.monotonic() < deadline:
             msg = consumer.poll(1.0)
-            if msg is None or msg.error():
+            if msg is None:
                 continue
-            event = from_envelope(_decode(msg.key()), _decode(msg.value()))
+            if msg.error():
+                problems.append(f"consumer error: {msg.error()}")
+                continue
+            try:
+                event = from_envelope(_decode(msg.key()), _decode(msg.value()))
+            except (ValueError, KeyError) as err:  # report, keep reading
+                value = msg.value() or b""
+                headers = [h[0] for h in msg.headers() or []]
+                problems.append(
+                    f"{type(err).__name__}: {err} (first bytes {value[:5].hex()}, headers {headers})"
+                )
+                continue
             if event is None:
                 continue
             events.append(event)
@@ -111,7 +124,8 @@ def main() -> int:
     status = connector.wait_running(CONNECT_URL, "shop-postgres")
     _make_changes()
     expected = Counter({"snapshot": 2, "insert": 2, "update": 1, "delete": 1})
-    events, lags = _consume(expected, timeout_s=120)
+    problems: list[str] = []
+    events, lags = _consume(expected, timeout_s=120, problems=problems)
     got = Counter(e.op for e in events)
 
     artifacts = _get_json(f"{REGISTRY_URL}/search/artifacts?limit=100")["count"]
@@ -127,6 +141,7 @@ def main() -> int:
         f"| Expected at least | {dict(sorted(expected.items()))} |",
         f"| Avro schemas in registry | {artifacts} |",
         f"| Live-change lag p50 / p95 | {percentile(lags, 50) if lags else 'n/a'} ms / {percentile(lags, 95) if lags else 'n/a'} ms |",
+        f"| Messages that could not be decoded | {len(problems)}{' (first: ' + problems[0] + ')' if problems else ''} |",
         f"| Result | {'PASS' if ok else 'FAIL'} |",
     ]
     report = "\n".join(lines)
