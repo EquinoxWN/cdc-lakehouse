@@ -4,7 +4,7 @@
 [![e2e](https://github.com/EquinoxWN/cdc-lakehouse/actions/workflows/e2e.yml/badge.svg)](https://github.com/EquinoxWN/cdc-lakehouse/actions/workflows/e2e.yml)
 ![status](https://img.shields.io/badge/status-M1%20done%2C%20M2%20in%20progress-yellow)
 
-> Get fresh analytics without hammering the production database: stream every change into a lakehouse you can query with SQL, seconds behind live.
+> Fresh analytics without hammering the production database, step one: Debezium streams every Postgres insert, update and delete into Kafka as Avro events, checked end to end in CI with about 270 ms lag.
 
 Part of my **Data Engineering** list · Python · SQL · core project
 
@@ -49,11 +49,12 @@ _Steps 1 and 2 are built and tested (M1); the rest is on the [roadmap](#roadmap)
 
 ## Tech stack
 
-| Area | Tools |
-|---|---|
-| Core | Postgres, Debezium, Kafka (KRaft), Kafka Connect Iceberg sink |
-| Lake | Apache Iceberg on MinIO (S3 API), Iceberg REST catalog |
-| Query/Ops | Trino, Docker Compose locally, Terraform for an AWS variant |
+| Area | In M1 | Planned |
+|---|---|---|
+| Capture | PostgreSQL 16 logical replication, Debezium 2.7 on Kafka Connect | - |
+| Transport | Kafka 3.8 (KRaft), Avro with Apicurio Registry | Kafka Connect Iceberg sink |
+| Lake / query | - | Apache Iceberg on MinIO (S3 API), Iceberg REST catalog, Trino |
+| Run / test | Docker Compose, Python check (psycopg, confluent-kafka, fastavro), GitHub Actions e2e | Terraform for an AWS variant |
 
 Language: **Python · SQL**, with Docker Compose for the stack.
 
@@ -154,7 +155,7 @@ What this repo must show before it counts as done:
 ## Why it matters
 
 - **Interview angle:** 'Sync an OLTP database to analytics in near real time'.
-- **Upstream I'm contributing to:** Debezium, Apache Iceberg or Apache Paimon (Alibaba origin).
+- **Upstream I'd like to contribute to:** Debezium, Apache Iceberg or Apache Paimon (Alibaba origin).
 
 ## Design docs
 
