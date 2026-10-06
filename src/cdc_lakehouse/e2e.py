@@ -67,6 +67,26 @@ def _make_changes() -> None:
         conn.execute("DELETE FROM customers WHERE email = 'temp@example.com'")
 
 
+def annotation(level: str, title: str, text: str) -> str:
+    """A GitHub Actions workflow command that shows text as a run annotation."""
+    body = text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    title = title.replace("%", "%25").replace(",", "%2C").replace("::", ": :")
+    return f"::{level} title={title}::{body}"
+
+
+def _wait_for_topic(topic: str, timeout_s: float) -> None:
+    """Block until the snapshot has created the topic."""
+    from confluent_kafka.admin import AdminClient
+
+    admin = AdminClient({"bootstrap.servers": BOOTSTRAP})
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if topic in admin.list_topics(timeout=5).topics:
+            return
+        time.sleep(1)
+    raise TimeoutError(f"topic {topic} was not created within {timeout_s}s")
+
+
 def _consume(
     expected: Counter[str], timeout_s: float, problems: list[str]
 ) -> tuple[list[ChangeEvent], list[int]]:
@@ -79,6 +99,8 @@ def _consume(
             "group.id": f"e2e-{int(time.time())}",
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
+            # A topic created after subscribing is otherwise only noticed every 5 minutes.
+            "topic.metadata.refresh.interval.ms": 2000,
         }
     )
     consumer.subscribe([TOPIC])
@@ -115,6 +137,16 @@ def _consume(
 
 
 def main() -> int:
+    """Run the check, report it, and turn any crash into a readable annotation in CI."""
+    try:
+        return _check()
+    except Exception as err:
+        if os.environ.get("GITHUB_ACTIONS"):
+            print(annotation("error", "e2e crashed", f"{type(err).__name__}: {err}"))
+        raise
+
+
+def _check() -> int:
     """Run the check and print a Markdown report; exit 1 on failure."""
     settings = connector.SourceSettings(
         db_password=os.environ.get("DEBEZIUM_PASSWORD", "debezium"),
@@ -122,6 +154,7 @@ def main() -> int:
     )
     connector.register(CONNECT_URL, "shop-postgres", connector.connector_config(settings))
     status = connector.wait_running(CONNECT_URL, "shop-postgres")
+    _wait_for_topic(TOPIC, timeout_s=90)
     _make_changes()
     expected = Counter({"snapshot": 2, "insert": 2, "update": 1, "delete": 1})
     problems: list[str] = []
@@ -149,6 +182,8 @@ def main() -> int:
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(summary, "a", encoding="utf-8") as f:
             f.write(report + "\n")
+    if os.environ.get("GITHUB_ACTIONS"):  # annotations are readable without signing in, unlike logs
+        print(annotation("notice" if ok else "error", "CDC end-to-end check", report))
     return 0 if ok else 1
 
 
