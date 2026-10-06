@@ -20,7 +20,7 @@ from collections import Counter
 from functools import cache
 from typing import Any
 
-from cdc_lakehouse import connector, wire
+from cdc_lakehouse import connector, registry, wire
 from cdc_lakehouse.events import ChangeEvent, from_envelope, lag_ms, percentile
 
 CONNECT_URL = os.environ.get("CONNECT_URL", "http://localhost:8083")
@@ -33,9 +33,7 @@ TOPIC = "shop.public.customers"
 @cache
 def _schema(content_id: int) -> Any:
     """Fetch and parse the Avro schema for a content id."""
-    import fastavro
-
-    return fastavro.parse_schema(_get_json(f"{REGISTRY_URL}/ids/contentIds/{content_id}"))
+    return registry.load_schema(lambda path: _get_json(REGISTRY_URL + path), content_id)
 
 
 def _get_json(url: str) -> Any:
