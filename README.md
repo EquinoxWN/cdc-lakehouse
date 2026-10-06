@@ -1,11 +1,22 @@
 # cdc-lakehouse
 
 [![ci](https://github.com/EquinoxWN/cdc-lakehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/EquinoxWN/cdc-lakehouse/actions/workflows/ci.yml)
+[![e2e](https://github.com/EquinoxWN/cdc-lakehouse/actions/workflows/e2e.yml/badge.svg)](https://github.com/EquinoxWN/cdc-lakehouse/actions/workflows/e2e.yml)
 ![status](https://img.shields.io/badge/status-M1%20done%2C%20M2%20in%20progress-yellow)
 
 > Get fresh analytics without hammering the production database: stream every change into a lakehouse you can query with SQL, seconds behind live.
 
 Part of my **Data Engineering** list · Python · SQL · core project
+
+## Proof it works
+
+GitHub Actions starts PostgreSQL, Kafka, the schema registry and Debezium, then the end-to-end check changes rows and decodes every resulting Avro event from Kafka: all 6 expected events arrive, none fail to decode, and a change reaches the consumer in about 270 ms. The report below is the one the run published:
+
+![End-to-end check in GitHub Actions: event counts, lag and job steps](docs/proof/e2e.jpg)
+
+Locally, lint is clean, 35 unit tests pass, and pip-audit finds no known vulnerabilities in the dependencies, including the streaming extras:
+
+![ruff, pytest and pip-audit output](docs/proof/tests.jpg)
 
 ## Architecture
 
@@ -76,18 +87,19 @@ Latest local run (full detail in [docs/results/m1.md](docs/results/m1.md)):
 
 | Check | Result |
 |---|---|
-| Unit tests (config, Connect REST, wire format, envelopes) | 29 passed, 0 failed |
+| Unit tests (config, Connect REST, wire format, envelopes, schema references) | 35 passed, 0 failed |
+| `pip-audit` (dev and stream extras) | no known vulnerabilities |
 | `ruff` | clean |
 | `actionlint` on both workflows | no errors |
 | Compose file and image tags | valid; all 4 images exist |
 
-The end-to-end check (snapshot, insert, update, delete events decoded from Avro, with p50 and p95 lag) runs in the `e2e` GitHub Actions workflow on every push; its table appears in the job summary.
+The end-to-end check runs in the `e2e` GitHub Actions workflow on every push. Latest result ([run 37477621075](https://github.com/EquinoxWN/cdc-lakehouse/actions/runs/37477621075)): 2 snapshot, 2 insert, 1 update and 1 delete events decoded from Avro, 0 undecodable messages, commit-to-consumer lag p50 268 ms and p95 269 ms. The report is published as a run annotation, readable without signing in.
 
 ### Test map
 
 ```mermaid
 mindmap
-  root((29 tests pass))
+  root((35 tests pass))
     Connector config 6
       pgoutput and publication
       Avro with Confluent framing
@@ -104,6 +116,11 @@ mindmap
       snapshot, insert, update, delete
       tombstones skipped
       lag percentiles
+    Schema references 4
+      nested types fetched first
+      cycles refused
+    CI report 2
+      one-line annotation
     CI only
       full stack end to end
 ```
