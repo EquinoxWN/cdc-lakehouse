@@ -47,6 +47,12 @@ _Steps 1 and 2 are built and tested (M1); the rest is on the [roadmap](#roadmap)
 5. Trino queries the tables with plain SQL, including time travel (`FOR TIMESTAMP AS OF`) to see yesterday's data.
 6. A new Postgres column flows through end to end, and a reconciliation job compares row counts and checksums between source and lake.
 
+## Who it helps
+
+- **Who:** Data engineers who need database changes in analytics without querying the production database.
+- **The problem:** Nightly extracts put load on the primary, arrive hours late and miss deletes.
+- **How to use it:** Run `make e2e` to start Postgres, Kafka, the schema registry and Debezium Connect with Docker Compose and check that every insert, update and delete arrives in Kafka as an Avro event; the connector configuration and the schema-reference resolver are a starting point for your own pipeline.
+
 ## Tech stack
 
 | Area | In M1 | Planned |
