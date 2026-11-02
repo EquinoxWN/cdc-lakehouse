@@ -14,7 +14,9 @@ def test_schema_id_is_big_endian():
     assert wire.split(b"\x00\x00\x00\x01\x00rest") == (256, b"rest")
 
 
-@pytest.mark.parametrize("bad", [b"", b"\x00\x00\x01", b"\x01\x00\x00\x00\x01payload"])
+@pytest.mark.parametrize(
+    "bad", [b"", b"\x00\x00\x01", b"\x00\x00\x00\x01", b"\x01\x00\x00\x00\x01payload"]
+)
 def test_rejects_unframed_bytes(bad):
     with pytest.raises(wire.WireFormatError):
         wire.split(bad)

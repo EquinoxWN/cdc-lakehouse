@@ -43,6 +43,11 @@ def test_missing_password_is_rejected():
         connector.connector_config(connector.SourceSettings())
 
 
+def test_empty_table_list_is_rejected():
+    with pytest.raises(ValueError, match="at least one table"):
+        connector.connector_config(connector.SourceSettings(db_password="s3cret", tables=()))
+
+
 def test_repr_hides_password():
     assert "s3cret" not in repr(SETTINGS)
 
@@ -103,6 +108,14 @@ def test_register_puts_config_idempotently(fake_connect):
     assert FakeConnect.puts[0][1] == cfg
 
 
+def test_register_tolerates_a_trailing_slash(monkeypatch):
+    # http.server folds a leading "//" into "/", so check the URL before it is sent.
+    sent = []
+    monkeypatch.setattr(connector, "_request", lambda method, url, body: sent.append((method, url)))
+    connector.register("http://connect:8083/", "shop-postgres", {"tasks.max": "1"})
+    assert sent == [("PUT", "http://connect:8083/connectors/shop-postgres/config")]
+
+
 def test_wait_running_polls_until_tasks_run(fake_connect):
     FakeConnect.statuses = [
         status("RUNNING"),
@@ -123,6 +136,13 @@ def test_wait_running_times_out(fake_connect):
     FakeConnect.statuses = [status("RUNNING", "UNASSIGNED")]
     with pytest.raises(connector.ConnectError, match="not running"):
         connector.wait_running(fake_connect, "shop-postgres", timeout_s=0.2, poll_s=0.01)
+
+
+def test_wait_running_reports_the_last_error_when_connect_never_answers():
+    # Port 9 (discard) on loopback refuses connections, like a Connect worker still starting.
+    with pytest.raises(connector.ConnectError, match="not running") as info:
+        connector.wait_running("http://127.0.0.1:9", "shop-postgres", timeout_s=0.3, poll_s=0.05)
+    assert isinstance(info.value.__cause__, OSError)
 
 
 @pytest.mark.parametrize("url", ["file:///etc/passwd", "ftp://example.com/x", "localhost:8083"])

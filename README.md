@@ -86,7 +86,7 @@ make e2e     # register the connector, change rows, consume and verify Avro even
 make down    # stop everything and delete the volumes
 ```
 
-Passwords for the local stack come from `POSTGRES_PASSWORD` and `DEBEZIUM_PASSWORD` (defaults are for local use only). Once the stack is up, events for `public.customers` land on the Kafka topic `shop.public.customers`.
+Passwords for the local stack come from `POSTGRES_PASSWORD` and `DEBEZIUM_PASSWORD` (defaults are for local use only). `make e2e` reaches the stack through `CONNECT_URL` (default `http://localhost:8083`), `REGISTRY_URL` (`http://localhost:8080/apis/registry/v2`), `KAFKA_BOOTSTRAP` (`localhost:29092`) and `PG_DSN` (`postgresql://postgres:postgres@localhost:5432/shop`). Once the stack is up, events for `public.customers` land on the Kafka topic `shop.public.customers`.
 
 ## Tests and results
 
@@ -94,29 +94,31 @@ Latest local run (full detail in [docs/results/m1.md](docs/results/m1.md)):
 
 | Check | Result |
 |---|---|
-| Unit tests (config, Connect REST, wire format, envelopes, schema references) | 35 passed, 0 failed |
+| Unit tests (config, Connect REST, wire format, envelopes, schema references) | 39 passed, 0 failed |
 | `pip-audit` (dev and stream extras) | no known vulnerabilities |
 | `ruff` | clean |
 | `actionlint` on both workflows | no errors |
 | Compose file and image tags | valid; all 4 images exist |
 
-The end-to-end check runs in the `e2e` GitHub Actions workflow on every push. Latest result ([run 37477621075](https://github.com/EquinoxWN/cdc-lakehouse/actions/runs/37477621075)): 2 snapshot, 2 insert, 1 update and 1 delete events decoded from Avro, 0 undecodable messages, commit-to-consumer lag p50 268 ms and p95 269 ms. The report is published as a run annotation, readable without signing in.
+The end-to-end check runs in the `e2e` GitHub Actions workflow on every push. Latest result ([run 37477621075](https://github.com/EquinoxWN/cdc-lakehouse/actions/runs/37477621075)): 2 snapshot, 2 insert, 1 update and 1 delete events decoded from Avro, 0 undecodable messages, commit-to-consumer lag p50 268 ms and p95 269 ms. The report is published as a run annotation, readable without signing in. Lag compares the Postgres commit timestamp with the consumer's wall clock, so it is only meaningful when both share a clock (one host, as in CI).
+
+The 10 quality rules (timeouts, retry-safe writes, clocks, mutation testing and more) are checked in [docs/quality/2026-11-01.md](docs/quality/2026-11-01.md).
 
 ### Test map
 
 ```mermaid
 mindmap
-  root((35 tests pass))
-    Connector config 6
+  root((39 tests pass))
+    Connector config 7
       pgoutput and publication
       Avro with Confluent framing
       password never printed
-    Connect REST client 7
+    Connect REST client 9
       idempotent PUT
       waits until RUNNING
       fails fast on FAILED
       only http and https URLs
-    Wire format 5
+    Wire format 6
       magic byte and schema id
       bad frames rejected
     Debezium events 10
