@@ -115,10 +115,13 @@ def wait_running(
     """Block until the connector and all tasks are RUNNING; fail fast on FAILED."""
     deadline = time.monotonic() + timeout_s
     last: dict[str, Any] = {}
+    last_err: Exception | None = None
     while time.monotonic() < deadline:
         try:
             last = _request("GET", f"{connect_url.rstrip('/')}/connectors/{name}/status")
-        except (ConnectError, OSError):
+        except (ConnectError, OSError) as err:  # Connect still starting
+            # Kept for the timeout message.
+            last_err = err
             time.sleep(poll_s)
             continue
         states = [last["connector"]["state"]] + [t["state"] for t in last.get("tasks", [])]
@@ -127,4 +130,6 @@ def wait_running(
         if last.get("tasks") and all(s == "RUNNING" for s in states):
             return last
         time.sleep(poll_s)
-    raise ConnectError(f"connector {name} not running after {timeout_s}s: {last}")
+    raise ConnectError(
+        f"connector {name} not running after {timeout_s}s: {last or last_err}"
+    ) from last_err

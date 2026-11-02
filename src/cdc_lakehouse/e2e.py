@@ -30,7 +30,7 @@ PG_DSN = os.environ.get("PG_DSN", "postgresql://postgres:postgres@localhost:5432
 TOPIC = "shop.public.customers"
 
 
-@cache
+@cache  # registry content ids are immutable, so entries never go stale; one process only
 def _schema(content_id: int) -> Any:
     """Fetch and parse the Avro schema for a content id."""
     return registry.load_schema(lambda path: _get_json(REGISTRY_URL + path), content_id)
@@ -56,7 +56,9 @@ def _make_changes() -> None:
     """Insert, update and delete customers so every live operation type is produced."""
     import psycopg
 
-    with psycopg.connect(PG_DSN, autocommit=True) as conn:
+    with psycopg.connect(PG_DSN, autocommit=True, connect_timeout=10) as conn:
+        # Safe to re-run: a second run against the same database must not hit the unique email.
+        conn.execute("DELETE FROM customers WHERE email = 'grace@example.com'")
         conn.execute("INSERT INTO customers (email, name) VALUES ('grace@example.com', 'Grace')")
         conn.execute(
             "UPDATE customers SET name = 'Ada Lovelace', updated_at = now() WHERE email = 'ada@example.com'"
